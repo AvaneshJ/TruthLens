@@ -26,7 +26,7 @@ export default function FairGPTDashboard() {
   const [loading, setLoading] = useState(false);
   const [mounted, setMounted] = useState(false);
   const [viewMode, setViewMode] = useState<"consensus" | "alternative">(
-    "consensus"
+    "consensus",
   );
 
   // 🟢 Media States
@@ -77,7 +77,9 @@ export default function FairGPTDashboard() {
       setSelectedFile(null);
     } catch (err: any) {
       alert(
-        err.name === "TimeoutError" ? "AI took too long." : "Verification Error"
+        err.name === "TimeoutError"
+          ? "AI took too long."
+          : "Verification Error",
       );
     } finally {
       setLoading(false);
@@ -284,7 +286,7 @@ export default function FairGPTDashboard() {
                           </span>
                           <span>{p}</span>
                         </li>
-                      )
+                      ),
                     )}
                   </ul>
                 </div>
@@ -305,7 +307,7 @@ export default function FairGPTDashboard() {
                           />
                           <span>{p}</span>
                         </li>
-                      )
+                      ),
                     )}
                   </ul>
                 </div>
