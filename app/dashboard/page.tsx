@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
+import { toPng } from "html-to-image";
 import {
   Search,
   ShieldCheck,
@@ -20,6 +21,7 @@ import {
   Bookmark,
   FileText,
   BookmarkCheck,
+  Download,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import BiasMeter from "../components/BiasMeter";
@@ -34,6 +36,29 @@ interface TempHistoryItem {
   result: any;
   createdAt: string;
 }
+
+const getBadgeStyles = (category: string) => {
+  if (!category)
+    return "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700";
+
+  switch (category) {
+    case "Govt of India":
+    case "State Government":
+    case "Constitutional Body":
+    case "Central Bank":
+      return "bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800";
+    case "IFCN Certified":
+    case "Independent Fact-Check":
+    case "Global Authority":
+      return "bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800";
+    case "Newspaper of Record":
+    case "National Wire":
+    case "Public Broadcaster":
+      return "bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800";
+    default:
+      return "bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700";
+  }
+};
 
 export default function TruthLensDashboard() {
   const { data: session } = useSession();
@@ -53,7 +78,13 @@ export default function TruthLensDashboard() {
   const [savedSearchId, setSavedSearchId] = useState<string | null>(null);
   const [language, setLanguage] = useState("English");
 
-  const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL;
+  // Chat UI States
+  const [activeQuery, setActiveQuery] = useState("");
+  const [activePreviewUrl, setActivePreviewUrl] = useState<string | null>(null);
+
+  // Fallback API URL so Vercel doesn't crash if env vars fail
+  const API_BASE_URL =
+    process.env.NEXT_PUBLIC_API_URL || "https://fair-gpt-backend.onrender.com";
 
   useEffect(() => {
     const saved = localStorage.getItem("fairgpt_temp_history");
@@ -82,16 +113,44 @@ export default function TruthLensDashboard() {
     }
   };
 
-  const verifyMediaFile = async (file: File) => {
+  const exportAsImage = async () => {
+    const element = document.getElementById("truth-card-content");
+    if (!element) return;
+
+    try {
+      // 🟢 Generates a high-quality PNG of the dashboard
+      const dataUrl = await toPng(element, {
+        cacheBust: true,
+        backgroundColor: theme === "dark" ? "#0f172a" : "#f8fafc",
+        style: {
+          padding: "20px",
+          borderRadius: "40px",
+        },
+      });
+
+      const link = document.createElement("a");
+      link.download = `TruthLens-${Date.now()}.png`;
+      link.href = dataUrl;
+      link.click();
+    } catch (err) {
+      console.error("Export failed:", err);
+    }
+  };
+
+  const verifyMediaFile = async (file: File, userText?: string) => {
     setLoading(true);
+    setResult(null);
+    setViewMode("consensus");
+
     const formData = new FormData();
     formData.append("file", file);
+    if (userText) formData.append("query", userText);
 
     try {
       const res = await fetch(`${API_BASE_URL}/api/verify-media`, {
         method: "POST",
         body: formData,
-        signal: AbortSignal.timeout(45000),
+        signal: AbortSignal.timeout(60000),
       });
 
       if (res.status === 429) {
@@ -103,6 +162,7 @@ export default function TruthLensDashboard() {
       setResult(data);
       setIsSaved(false);
       setSavedSearchId(null);
+
       setQuery("");
       setPreviewUrl(null);
       setSelectedFile(null);
@@ -159,13 +219,16 @@ export default function TruthLensDashboard() {
   };
 
   const handleSearch = async (forcedQuery?: string) => {
-    if (selectedFile && !query && !forcedQuery) {
-      verifyMediaFile(selectedFile);
+    const q = forcedQuery || query;
+    if (!q.trim() && !selectedFile) return;
+
+    setActiveQuery(q);
+    setActivePreviewUrl(previewUrl);
+
+    if (selectedFile) {
+      verifyMediaFile(selectedFile, q);
       return;
     }
-
-    const q = forcedQuery || query;
-    if (!q.trim()) return;
 
     setLoading(true);
     setResult(null);
@@ -178,11 +241,7 @@ export default function TruthLensDashboard() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ query: q, language: language }),
       });
-      if (!res.ok) {
-        const errorText = await res.text();
-        console.error("Server Error:", errorText);
-        throw new Error(`HTTP error! status: ${res.status}`);
-      }
+      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
       const data = await res.json();
       setResult(data);
       setQuery("");
@@ -196,8 +255,8 @@ export default function TruthLensDashboard() {
   const handleSaveResult = () => {
     if (isSaved) return;
 
-    if (result && query) {
-      saveToHistory(query, result);
+    if (result && activeQuery) {
+      saveToHistory(activeQuery, result);
     } else if (result) {
       saveToHistory("Search Result", result);
     }
@@ -205,8 +264,10 @@ export default function TruthLensDashboard() {
   };
 
   const handleDemoResult = (q: string, mockResult: any) => {
+    setActiveQuery(q);
+    setActivePreviewUrl(null);
     setResult(mockResult);
-    setQuery(q);
+    setQuery("");
     setViewMode("consensus");
     setIsSaved(false);
   };
@@ -220,6 +281,8 @@ export default function TruthLensDashboard() {
           onClick={() => {
             setResult(null);
             setQuery("");
+            setActiveQuery("");
+            setActivePreviewUrl(null);
             setIsSaved(false);
             setViewMode("consensus");
           }}
@@ -297,11 +360,11 @@ export default function TruthLensDashboard() {
 
       <div
         className={`flex-1 flex flex-col items-center px-6 transition-all duration-700 overflow-y-auto ${
-          result ? "pt-28 pb-48" : "justify-center"
+          result || loading ? "pt-28 pb-48" : "justify-center"
         }`}
       >
-        {!result && !loading && (
-          <header className="text-center mb-10 animate-in fade-in zoom-in">
+        {!result && !loading && !activeQuery && !activePreviewUrl && (
+          <header className="text-center mb-2 animate-in fade-in zoom-in">
             <Link href="/">
               <h1 className="text-5xl font-black mb-4 hover:text-blue-600 transition-colors cursor-pointer">
                 Verify the <span className="text-blue-600">Unseen.</span>
@@ -327,264 +390,309 @@ export default function TruthLensDashboard() {
                 handleSearch(q);
               }}
             />
-            <TestDemoCards
-              onSelect={(q, mockResult) => {
-                setQuery(q);
-                handleDemoResult(q, mockResult);
-              }}
-            />
           </header>
         )}
 
-        {loading && (
-          <div className="animate-pulse text-blue-600 font-black uppercase text-sm">
-            Auditing Integrity...
-          </div>
-        )}
-
-        {result && (
-          <div className="w-full max-w-4xl space-y-4 animate-in fade-in slide-in-from-bottom-10 duration-700">
-            <div className="flex justify-end">
-              <button
-                onClick={handleSaveResult}
-                disabled={isSaved}
-                className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 ${
-                  isSaved
-                    ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 cursor-default"
-                    : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/40 dark:hover:text-emerald-300 active:scale-95"
-                }`}
-              >
-                {isSaved ? (
-                  <>
-                    <BookmarkCheck size={14} />
-                    <span>Saved</span>
-                  </>
+        {/* 🟢 THE CONVERSATIONAL CHAT INTERFACE */}
+        {(activeQuery || activePreviewUrl) && (result || loading) && (
+          <div className="w-full max-w-4xl flex flex-col gap-10 pb-12 animate-in fade-in slide-in-from-bottom-10 duration-700">
+            {/* USER BUBBLE */}
+            <div className="flex gap-4">
+              <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
+                {session?.user?.image ? (
+                  <img src={session.user.image} alt="User" />
                 ) : (
-                  <>
-                    <Bookmark size={14} />
-                    <span>Save to History</span>
-                  </>
+                  <User size={20} className="text-slate-500" />
                 )}
-              </button>
+              </div>
+              <div className="flex flex-col max-w-[85%] pt-1">
+                <span className="font-bold text-sm text-slate-700 dark:text-slate-300 mb-2">
+                  You
+                </span>
+                <div className="space-y-4">
+                  {activePreviewUrl && (
+                    <img
+                      src={activePreviewUrl}
+                      alt="Uploaded media"
+                      className="max-w-xs md:max-w-md rounded-2xl border border-slate-200 dark:border-slate-700 shadow-md object-contain"
+                    />
+                  )}
+                  {activeQuery && (
+                    <p className="text-slate-800 dark:text-slate-100 text-lg md:text-xl leading-relaxed whitespace-pre-wrap">
+                      {activeQuery}
+                    </p>
+                  )}
+                </div>
+              </div>
             </div>
 
-            <div className="bg-white dark:bg-slate-900/60 backdrop-blur-xl rounded-[40px] border dark:border-slate-800 shadow-2xl p-8 md:p-12 relative">
-              <button
-                onClick={() => {
-                  setResult(null);
-                  setQuery("");
-                  setIsSaved(false);
-                }}
-                className="absolute top-6 left-6 p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
-              >
-                <X size={20} />
-              </button>
-
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10 mt-8 md:mt-0">
-                <div className="flex items-center gap-3">
-                  <ShieldCheck className="text-blue-600" size={24} />
-                  <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">
-                    Verified Verdict
-                  </h2>
-                </div>
-                <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl border dark:border-slate-700 shadow-sm">
-                  <button
-                    onClick={() => setViewMode("consensus")}
-                    className={`px-5 py-2 rounded-xl text-[10px] font-bold transition-all ${
-                      viewMode === "consensus"
-                        ? "bg-white dark:bg-slate-900 shadow-md text-blue-600"
-                        : "text-slate-400"
-                    }`}
-                  >
-                    Consensus
-                  </button>
-                  <button
-                    onClick={() => setViewMode("alternative")}
-                    className={`px-5 py-2 rounded-xl text-[10px] font-bold transition-all flex items-center gap-2 ${
-                      viewMode === "alternative"
-                        ? "bg-white dark:bg-slate-900 shadow-md text-amber-600"
-                        : "text-slate-400"
-                    }`}
-                  >
-                    <Repeat size={12} /> Alternative
-                  </button>
-                </div>
-
-                <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800/50 px-4 py-2 rounded-2xl border dark:border-slate-800">
-                  <div className="text-right leading-none">
-                    <p className="text-[8px] font-black uppercase text-slate-400 mb-1">
-                      AI Certainty
-                    </p>
-                    <p className="text-xs font-bold text-blue-600">
-                      {result.certainty || 0}%
-                    </p>
-                  </div>
-                  <div className="w-10 h-10 relative">
-                    <svg className="w-full h-full -rotate-90">
-                      <circle
-                        cx="20"
-                        cy="20"
-                        r="16"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="3.5"
-                        className="text-slate-200 dark:text-slate-800"
-                      />
-                      <circle
-                        cx="20"
-                        cy="20"
-                        r="16"
-                        fill="none"
-                        stroke="currentColor"
-                        strokeWidth="3.5"
-                        strokeLinecap="round"
-                        className="text-blue-600 transition-all duration-1000"
-                        strokeDasharray={100}
-                        strokeDashoffset={100 - (result.certainty || 0)}
-                      />
-                    </svg>
-                  </div>
-                </div>
+            {/* AI BUBBLE */}
+            <div className="flex gap-4">
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-600 to-indigo-600 flex items-center justify-center shrink-0 shadow-lg shadow-blue-500/30">
+                <ShieldCheck size={20} className="text-white" />
               </div>
+              <div className="flex-1 min-w-0 pt-1">
+                <span className="font-bold text-sm text-blue-600 mb-4 block">
+                  TruthLens AI
+                </span>
 
-              <p
-                className={`text-lg md:text-xl leading-relaxed font-medium mb-12 ${
-                  viewMode === "alternative"
-                    ? "text-amber-800 dark:text-amber-400 italic"
-                    : "text-slate-800 dark:text-slate-200"
-                }`}
-              >
-                {viewMode === "consensus"
-                  ? result.summary
-                  : result.counter_summary}
-              </p>
+                {loading && (
+                  <div className="flex items-center gap-3 text-slate-500 dark:text-slate-400 font-medium bg-white dark:bg-slate-800/50 w-fit px-5 py-3 rounded-2xl border border-slate-100 dark:border-slate-700 animate-pulse">
+                    <div className="w-4 h-4 border-2 border-blue-500 border-t-transparent rounded-full animate-spin" />
+                    Auditing global sources...
+                  </div>
+                )}
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t dark:border-slate-800 pt-10">
-                <div className="bg-blue-50/50 dark:bg-blue-900/10 p-6 rounded-[32px] border border-blue-100 dark:border-blue-900/30">
-                  <h4 className="text-[10px] font-black uppercase text-blue-600 mb-4 tracking-widest">
-                    Key Clarifications
-                  </h4>
-                  <ul className="text-[13px] space-y-4">
-                    {(result.clarifications || []).map(
-                      (p: string, i: number) => (
-                        <li
-                          key={i}
-                          className="flex gap-3 text-slate-700 dark:text-slate-300"
-                        >
-                          <span className="text-blue-500 font-bold">
-                            0{i + 1}
-                          </span>
-                          <span>{p}</span>
-                        </li>
-                      ),
-                    )}
-                  </ul>
-                </div>
-                <div className="bg-emerald-50/50 dark:bg-emerald-900/10 p-6 rounded-[32px] border border-emerald-100 dark:border-emerald-900/30">
-                  <h4 className="text-[10px] font-black uppercase text-emerald-600 mb-4 tracking-widest">
-                    Audit Trail
-                  </h4>
-                  <ul className="text-[13px] space-y-4">
-                    {(result.audit_history || []).map(
-                      (p: string, i: number) => (
-                        <li
-                          key={i}
-                          className="flex gap-3 text-slate-700 dark:text-slate-300"
-                        >
-                          <CheckCircle2
-                            size={14}
-                            className="text-emerald-500 mt-0.5"
-                          />
-                          <span>{p}</span>
-                        </li>
-                      ),
-                    )}
-                  </ul>
-                </div>
-              </div>
-
-              <div className="mt-10 border-t dark:border-slate-800 pt-8">
-                <p className="text-[10px] font-black uppercase text-slate-400 mb-4 tracking-widest">
-                  Ground Truth Sources
-                </p>
-                <div className="flex flex-wrap gap-3">
-                  {(result.sources || []).map((srcObj: any, i: number) => (
-                    <div key={i} className="group relative">
-                      <a
-                        href={srcObj?.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="flex items-center gap-2 px-4 py-2 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border dark:border-slate-700 text-[11px] font-bold hover:border-blue-500 hover:text-blue-600 transition-all"
+                {result && (
+                  <div className="space-y-4 animate-in fade-in duration-500">
+                    <div className="flex justify-end mb-4">
+                      <button
+                        onClick={exportAsImage}
+                        className="flex items-center gap-2 px-4 py-2.5 bg-blue-600 text-white rounded-xl text-xs font-bold hover:bg-blue-700 active:scale-95 transition-all shadow-lg shadow-blue-500/20"
                       >
-                        <Globe size={12} />
-                        <span>{srcObj?.meta?.name || "Verified Source"}</span>
-                        {srcObj?.meta?.certified && (
-                          <ShieldCheck
-                            size={10}
-                            className="text-blue-500 animate-in zoom-in"
-                          />
+                        <Download size={14} />
+                        <span>Export Card</span>
+                      </button>
+                      <button
+                        onClick={handleSaveResult}
+                        disabled={isSaved}
+                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 ${
+                          isSaved
+                            ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 cursor-default"
+                            : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/40 dark:hover:text-emerald-300 active:scale-95"
+                        }`}
+                      >
+                        {isSaved ? (
+                          <>
+                            <BookmarkCheck size={14} />
+                            <span>Saved</span>
+                          </>
+                        ) : (
+                          <>
+                            <Bookmark size={14} />
+                            <span>Save to History</span>
+                          </>
                         )}
-                      </a>
-                      <div className="absolute bottom-full mb-3 left-0 w-72 p-5 bg-white dark:bg-slate-900 rounded-3xl border dark:border-slate-800 shadow-2xl opacity-0 translate-y-2 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 transition-all z-50">
-                        <div className="flex justify-between items-start mb-3">
-                          <span className="text-[9px] font-black uppercase text-blue-600 px-2 py-1 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
-                            {srcObj?.meta?.type || "Standard Source"}
-                          </span>
-                          {srcObj?.meta?.badge && (
-                            <span className="text-[8px] bg-emerald-100 dark:bg-emerald-900/40 text-emerald-600 px-2 py-1 rounded-lg font-bold">
-                              {srcObj.meta.badge}
-                            </span>
-                          )}
+                      </button>
+                    </div>
+
+                    <div
+                      id="truth-card-content"
+                      className="bg-white dark:bg-slate-900/60 backdrop-blur-xl rounded-[40px] border dark:border-slate-800 shadow-2xl p-8 md:p-12 relative"
+                    >
+                      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-10 mt-8 md:mt-0">
+                        <div className="flex items-center gap-3">
+                          <ShieldCheck className="text-blue-600" size={24} />
+                          <h2 className="text-xs font-black uppercase tracking-widest text-slate-400">
+                            Verified Verdict
+                          </h2>
                         </div>
-                        <h5 className="text-sm font-bold mb-1">
-                          {srcObj?.meta?.name}
-                        </h5>
-                        <p className="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed mb-4">
-                          {srcObj?.meta?.focus}
+                        <div className="flex items-center bg-slate-100 dark:bg-slate-800 p-1 rounded-2xl border dark:border-slate-700 shadow-sm">
+                          <button
+                            onClick={() => setViewMode("consensus")}
+                            className={`px-5 py-2 rounded-xl text-[10px] font-bold transition-all ${
+                              viewMode === "consensus"
+                                ? "bg-white dark:bg-slate-900 shadow-md text-blue-600"
+                                : "text-slate-400"
+                            }`}
+                          >
+                            Consensus
+                          </button>
+                          <button
+                            onClick={() => setViewMode("alternative")}
+                            className={`px-5 py-2 rounded-xl text-[10px] font-bold transition-all flex items-center gap-2 ${
+                              viewMode === "alternative"
+                                ? "bg-white dark:bg-slate-900 shadow-md text-amber-600"
+                                : "text-slate-400"
+                            }`}
+                          >
+                            <Repeat size={12} /> Alternative
+                          </button>
+                        </div>
+
+                        <div className="flex items-center gap-3 bg-slate-50 dark:bg-slate-800/50 px-4 py-2 rounded-2xl border dark:border-slate-800">
+                          <div className="text-right leading-none">
+                            <p className="text-[8px] font-black uppercase text-slate-400 mb-1">
+                              AI Certainty
+                            </p>
+                            <p className="text-xs font-bold text-blue-600">
+                              {result.certainty || 0}%
+                            </p>
+                          </div>
+                          <div className="w-10 h-10 relative">
+                            <svg className="w-full h-full -rotate-90">
+                              <circle
+                                cx="20"
+                                cy="20"
+                                r="16"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="3.5"
+                                className="text-slate-200 dark:text-slate-800"
+                              />
+                              <circle
+                                cx="20"
+                                cy="20"
+                                r="16"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="3.5"
+                                strokeLinecap="round"
+                                className="text-blue-600 transition-all duration-1000"
+                                strokeDasharray={100}
+                                strokeDashoffset={100 - (result.certainty || 0)}
+                              />
+                            </svg>
+                          </div>
+                        </div>
+                      </div>
+
+                      <p
+                        className={`text-lg md:text-xl leading-relaxed font-medium mb-12 ${
+                          viewMode === "alternative"
+                            ? "text-amber-800 dark:text-amber-400 italic"
+                            : "text-slate-800 dark:text-slate-200"
+                        }`}
+                      >
+                        {viewMode === "consensus"
+                          ? result.summary
+                          : result.counter_summary}
+                      </p>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6 border-t dark:border-slate-800 pt-10">
+                        <div className="bg-blue-50/50 dark:bg-blue-900/10 p-6 rounded-[32px] border border-blue-100 dark:border-blue-900/30">
+                          <h4 className="text-[10px] font-black uppercase text-blue-600 mb-4 tracking-widest">
+                            Key Clarifications
+                          </h4>
+                          <ul className="text-[13px] space-y-4">
+                            {(result.clarifications || []).map(
+                              (p: string, i: number) => (
+                                <li
+                                  key={i}
+                                  className="flex gap-3 text-slate-700 dark:text-slate-300"
+                                >
+                                  <span className="text-blue-500 font-bold">
+                                    0{i + 1}
+                                  </span>
+                                  <span>{p}</span>
+                                </li>
+                              ),
+                            )}
+                          </ul>
+                        </div>
+                        <div className="bg-emerald-50/50 dark:bg-emerald-900/10 p-6 rounded-[32px] border border-emerald-100 dark:border-emerald-900/30">
+                          <h4 className="text-[10px] font-black uppercase text-emerald-600 mb-4 tracking-widest">
+                            Audit Trail
+                          </h4>
+                          <ul className="text-[13px] space-y-4">
+                            {(result.audit_history || []).map(
+                              (p: string, i: number) => (
+                                <li
+                                  key={i}
+                                  className="flex gap-3 text-slate-700 dark:text-slate-300"
+                                >
+                                  <CheckCircle2
+                                    size={14}
+                                    className="text-emerald-500 mt-0.5"
+                                  />
+                                  <span>{p}</span>
+                                </li>
+                              ),
+                            )}
+                          </ul>
+                        </div>
+                      </div>
+
+                      <div className="mt-10 border-t dark:border-slate-800 pt-8">
+                        <p className="text-[10px] font-black uppercase text-slate-400 mb-4 tracking-widest">
+                          Ground Truth Sources
                         </p>
-                        <div className="flex items-center gap-2 pt-3 border-t dark:border-slate-800">
-                          <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                          <span className="text-[10px] font-bold uppercase text-slate-400">
-                            Reliability:{" "}
-                            {srcObj?.meta?.reliability || "Verified"}
-                          </span>
+                        <div className="flex flex-wrap gap-3">
+                          {(result.sources || []).map(
+                            (srcObj: any, i: number) => (
+                              <div key={i} className="group relative">
+                                <a
+                                  href={srcObj?.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-2 px-4 py-2 bg-slate-50 dark:bg-slate-800/50 rounded-2xl border dark:border-slate-700 text-[11px] font-bold hover:border-blue-500 hover:text-blue-600 transition-all"
+                                >
+                                  <Globe size={12} />
+                                  <span>
+                                    {srcObj?.meta?.name || "Verified Source"}
+                                  </span>
+                                  <ShieldCheck
+                                    size={10}
+                                    className="text-blue-500 animate-in zoom-in"
+                                  />
+                                </a>
+                                <div className="absolute bottom-full mb-3 left-0 w-72 p-5 bg-white dark:bg-slate-900 rounded-3xl border dark:border-slate-800 shadow-2xl opacity-0 translate-y-2 pointer-events-none group-hover:opacity-100 group-hover:translate-y-0 transition-all z-50">
+                                  <div className="flex justify-between items-start mb-3">
+                                    <span
+                                      className={`text-[9px] font-black uppercase px-2 py-1 rounded-lg border ${getBadgeStyles(srcObj?.meta?.category)}`}
+                                    >
+                                      {srcObj?.meta?.category ||
+                                        "Standard Source"}
+                                    </span>
+                                    <div className="flex items-center gap-1">
+                                      <span className="text-[10px] font-bold text-slate-500">
+                                        Trust:
+                                      </span>
+                                      <span className="text-[10px] font-black text-blue-600">
+                                        {srcObj?.meta?.trust_score || 50}%
+                                      </span>
+                                    </div>
+                                  </div>
+                                  <h5 className="text-sm font-bold mb-1">
+                                    {srcObj?.meta?.name}
+                                  </h5>
+                                  <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate mt-2">
+                                    {srcObj?.url}
+                                  </p>
+                                </div>
+                              </div>
+                            ),
+                          )}
                         </div>
                       </div>
                     </div>
-                  ))}
-                </div>
-              </div>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
-              <AnalyticsCard title="Sentiment Bias">
-                <div className="flex flex-col items-center justify-center h-full min-h-[200px]">
-                  <BiasMeter score={result.bias_score || 0} />
-                </div>
-              </AnalyticsCard>
-              <AnalyticsCard title="Source Integrity">
-                <div className="w-full h-full min-h-[220px]">
-                  <VerificationChart data={result.verification_audit} />
-                </div>
-              </AnalyticsCard>
-              <AnalyticsCard title="Temporal Trend">
-                <div className="flex flex-col h-full min-h-[220px]">
-                  <TrendChart data={result.trend_history || []} />
-                </div>
-              </AnalyticsCard>
-              <AnalyticsCard title="Logic Health">
-                <div className="flex flex-col h-full justify-between min-h-[220px]">
-                  <p className="text-[12px] italic text-slate-600 dark:text-slate-400">
-                    "{result.logic_audit || "Audit performed."}"
-                  </p>
-                  <div className="mt-auto pt-4 border-t dark:border-slate-800 flex items-center gap-2">
-                    <ShieldAlert size={12} className="text-emerald-500" />
-                    <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-tighter">
-                      Analysis Complete
-                    </span>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-stretch">
+                      <AnalyticsCard title="Sentiment Bias">
+                        <div className="flex flex-col items-center justify-center h-full min-h-[200px]">
+                          <BiasMeter score={result.bias_score || 0} />
+                        </div>
+                      </AnalyticsCard>
+                      <AnalyticsCard title="Source Integrity">
+                        <div className="w-full h-full min-h-[220px]">
+                          <VerificationChart data={result.verification_audit} />
+                        </div>
+                      </AnalyticsCard>
+                      <AnalyticsCard title="Temporal Trend">
+                        <div className="flex flex-col h-full min-h-[220px]">
+                          <TrendChart data={result.trend_history || []} />
+                        </div>
+                      </AnalyticsCard>
+                      <AnalyticsCard title="Logic Health">
+                        <div className="flex flex-col h-full justify-between min-h-[220px]">
+                          <p className="text-[12px] italic text-slate-600 dark:text-slate-400">
+                            "{result.logic_audit || "Audit performed."}"
+                          </p>
+                          <div className="mt-auto pt-4 border-t dark:border-slate-800 flex items-center gap-2">
+                            <ShieldAlert
+                              size={12}
+                              className="text-emerald-500"
+                            />
+                            <span className="text-[10px] font-bold text-emerald-500 uppercase tracking-tighter">
+                              Analysis Complete
+                            </span>
+                          </div>
+                        </div>
+                      </AnalyticsCard>
+                    </div>
                   </div>
-                </div>
-              </AnalyticsCard>
+                )}
+              </div>
             </div>
           </div>
         )}
@@ -592,7 +700,7 @@ export default function TruthLensDashboard() {
 
       <div
         className={`fixed bottom-0 left-0 right-0 p-6 z-50 bg-gradient-to-t from-slate-50 dark:from-[#0f172a] transition-all ${
-          result ? "translate-y-0" : "relative mt-12"
+          result || loading ? "translate-y-0" : "relative mt-12"
         }`}
       >
         <div className="max-w-3xl mx-auto relative group">
@@ -618,7 +726,6 @@ export default function TruthLensDashboard() {
           )}
 
           <div className="relative flex items-center bg-white dark:bg-slate-900 rounded-[32px] border border-slate-200 dark:border-slate-800 p-2 shadow-2xl transition-all focus-within:ring-2 focus-within:ring-blue-500/20">
-            {/* Attachment Icon */}
             <label className="ml-2 p-2.5 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full group transition-all">
               <Paperclip
                 size={20}
@@ -634,13 +741,12 @@ export default function TruthLensDashboard() {
 
             <Search className="ml-2 text-slate-400" size={20} />
 
-            {/* Text Input (flex-1 ensures it takes up all remaining middle space) */}
             <input
               type="text"
               className="flex-1 w-full p-3 ml-2 outline-none text-[15px] bg-transparent text-slate-800 dark:text-slate-200 placeholder:text-slate-400"
               placeholder={
                 selectedFile
-                  ? "Click verify to analyze image..."
+                  ? "Add text context to your image..."
                   : "Enter a claim or paste screenshot..."
               }
               value={query || ""}
@@ -649,15 +755,12 @@ export default function TruthLensDashboard() {
               onPaste={handlePaste}
             />
 
-            {/* Seamless Language Selector */}
-            {/* Seamless Language Selector */}
             <div className="relative flex items-center border-l border-slate-200 dark:border-slate-700 mr-2 pl-2">
               <select
                 value={language}
                 onChange={(e) => setLanguage(e.target.value)}
                 className="appearance-none bg-transparent py-2 pl-3 pr-8 text-sm font-semibold text-slate-700 dark:text-slate-300 outline-none focus:ring-0 cursor-pointer hover:text-slate-900 dark:hover:text-white transition-colors"
               >
-                {/* 🟢 FIX: Added explicit bg and text colors to every option */}
                 <option
                   className="bg-white text-slate-800 dark:bg-slate-800 dark:text-slate-200"
                   value="English"
@@ -701,7 +804,6 @@ export default function TruthLensDashboard() {
                   ગુજરાતી
                 </option>
               </select>
-              {/* Custom minimal dropdown arrow */}
               <div className="absolute right-2 pointer-events-none">
                 <svg
                   className="w-4 h-4 text-slate-400"
@@ -719,7 +821,6 @@ export default function TruthLensDashboard() {
               </div>
             </div>
 
-            {/* Verify Button */}
             <button
               onClick={() => handleSearch()}
               disabled={loading}
