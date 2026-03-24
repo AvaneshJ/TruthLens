@@ -1,6 +1,6 @@
 import "./globals.css";
 import { Providers } from "./components/Providers";
-
+import type { Metadata } from "next";
 export const metadata: Metadata = {
   title: "TruthLens — AI News Authenticator",
   description: "AI-powered news verification and fact-checking.",
