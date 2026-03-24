@@ -398,8 +398,8 @@ export default function TruthLensDashboard() {
             {/* USER BUBBLE */}
             <div className="flex gap-4">
               <div className="w-10 h-10 rounded-full bg-slate-200 dark:bg-slate-700 flex items-center justify-center shrink-0 overflow-hidden shadow-sm">
-                {session?.user?.image ? (
-                  <img src={session.user.image} alt="User" />
+                {(session?.user as any)?.image ? (
+                  <img src={(session?.user as any).image} alt="User" />
                 ) : (
                   <User size={20} className="text-slate-500" />
                 )}
