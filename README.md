@@ -6,7 +6,7 @@
 
 ## 📸 Preview
 
-![TruthLens UI](<img width="1778" height="797" alt="image" src="https://github.com/user-attachments/assets/14fa3087-4892-45a9-b198-bc714778c8c0" />)
+<img width="1778" height="797" alt="image" src="https://github.com/user-attachments/assets/14fa3087-4892-45a9-b198-bc714778c8c0" />
 <img width="1738" height="737" alt="image" src="https://github.com/user-attachments/assets/b705d547-9765-4629-9dcc-2b6626b00468" />
 <img width="1683" height="852" alt="image" src="https://github.com/user-attachments/assets/63cbd020-ee74-41d3-949f-79bfd16dba0d" />
 
