@@ -7,6 +7,9 @@ module.exports = {
   ],
   theme: {
     extend: {
+      screens: {
+        xs: "400px",
+      },
       keyframes: {
         loading: {
           "0%": { transform: "translateX(-100%)" },

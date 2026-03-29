@@ -22,6 +22,7 @@ import {
   FileText,
   BookmarkCheck,
   Download,
+  Menu,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import BiasMeter from "../components/BiasMeter";
@@ -80,6 +81,9 @@ export default function TruthLensDashboard() {
   // Chat UI States
   const [activeQuery, setActiveQuery] = useState("");
   const [activePreviewUrl, setActivePreviewUrl] = useState<string | null>(null);
+
+  // Mobile Menu State
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Fallback API URL so Vercel doesn't crash if env vars fail
   const API_BASE_URL =
@@ -275,7 +279,7 @@ export default function TruthLensDashboard() {
 
   return (
     <main className="min-h-screen bg-slate-50 dark:bg-[#0f172a] text-slate-900 dark:text-slate-100 flex flex-col transition-all duration-500">
-      <nav className="fixed top-0 left-0 right-0 z-50 flex justify-between items-center p-4 sm:p-6 max-w-6xl mx-auto backdrop-blur-md">
+      <nav className="fixed top-0 left-0 right-0 z-50 flex justify-between items-center px-2 sm:px-4 py-3 max-w-6xl mx-auto backdrop-blur-md bg-slate-50/80 dark:bg-[#0f172a]/80">
         <button
           onClick={() => {
             setResult(null);
@@ -285,87 +289,124 @@ export default function TruthLensDashboard() {
             setIsSaved(false);
             setViewMode("consensus");
           }}
-          className="flex items-center gap-2 font-bold text-xl hover:opacity-80 transition-opacity"
+          className="flex items-center gap-1.5 sm:gap-2 font-bold hover:opacity-80 transition-opacity"
         >
           <div className="relative">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
-              <FileText size={20} />
+            <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg sm:rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
+              <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center animate-pulse">
-              <ShieldCheck size={8} className="text-white" />
+            <div className="absolute -top-0.5 -right-0.5 w-3 h-3 sm:w-4 sm:h-4 bg-emerald-500 rounded-full flex items-center justify-center animate-pulse">
+              <ShieldCheck className="w-2 h-2 sm:w-2.5 sm:h-2.5 text-white" />
             </div>
           </div>
-          <span className="font-bold text-xl tracking-tight">TruthLens</span>
+          <span className="font-bold text-base sm:text-xl tracking-tight">TruthLens</span>
         </button>
 
-        <div className="flex items-center gap-3">
-          {session?.user ? (
-            <>
-              <Link
-                href="/history"
-                className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-2xl shadow-sm text-sm font-medium hover:border-blue-500 transition-all"
-              >
-                <History size={16} className="text-slate-400" />
-                <span className="hidden sm:inline">History</span>
-              </Link>
-              <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-900/30 rounded-2xl border border-blue-200 dark:border-blue-800">
-                <User size={14} className="text-blue-600" />
-                <span className="hidden sm:inline text-sm font-medium text-blue-600">
-                  {session.user.name || session.user.email?.split("@")[0]}
-                </span>
-              </div>
+        <div className="flex items-center gap-1 sm:gap-2">
+          <Link
+            href="/history"
+            className="p-2 sm:px-3 sm:py-2 bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-xl shadow-sm hover:border-blue-500 transition-all"
+          >
+            <History size={16} className="text-slate-400" />
+          </Link>
+          
+          {/* Desktop Auth Buttons */}
+          <div className="hidden sm:flex items-center gap-2">
+            {session?.user ? (
               <button
                 onClick={() => signOut({ callbackUrl: "/dashboard" })}
-                className="p-3 rounded-2xl bg-white dark:bg-slate-800 border dark:border-slate-700 shadow-sm transition-transform hover:scale-105 text-slate-400 hover:text-red-500"
+                className="p-3 rounded-xl bg-white dark:bg-slate-800 border dark:border-slate-700 shadow-sm transition-transform hover:scale-105 text-slate-400 hover:text-red-500"
               >
-                <LogOut size={18} />
+                <LogOut className="w-4.5 h-4.5" />
               </button>
-            </>
-          ) : (
-            <>
-              <Link
-                href="/history"
-                className="flex items-center gap-2 px-4 py-2 bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-2xl shadow-sm text-sm font-medium hover:border-blue-500 transition-all"
-              >
-                <History size={16} className="text-slate-400" />
-                <span className="hidden sm:inline">History</span>
-              </Link>
-              <Link
-                href="/login"
-                className="px-4 py-2 bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-2xl shadow-sm text-sm font-medium hover:border-blue-500 transition-all"
-              >
-                Login
-              </Link>
-              <Link
-                href="/signup"
-                className="px-4 py-2 bg-blue-600 text-white rounded-2xl shadow-sm text-sm font-bold hover:bg-blue-700 transition-all"
-              >
-                Sign Up
-              </Link>
-            </>
-          )}
+            ) : (
+              <>
+                <Link
+                  href="/login"
+                  className="px-4 py-2 bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-xl shadow-sm text-sm font-medium hover:border-blue-500 transition-all"
+                >
+                  Login
+                </Link>
+                <Link
+                  href="/signup"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-xl shadow-sm text-sm font-bold hover:bg-blue-700 transition-all"
+                >
+                  Sign Up
+                </Link>
+              </>
+            )}
+          </div>
+
           <button
             onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
-            className="p-3 rounded-2xl bg-white dark:bg-slate-800 border dark:border-slate-700 shadow-sm transition-transform hover:scale-105"
+            className="p-2 sm:p-3 rounded-xl bg-white dark:bg-slate-800 border dark:border-slate-700 shadow-sm transition-transform hover:scale-105"
           >
             {theme === "dark" ? (
-              <Sun size={18} className="text-yellow-400" />
+              <Sun className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-yellow-400" />
             ) : (
-              <Moon size={18} className="text-blue-600" />
+              <Moon className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-blue-600" />
             )}
           </button>
+
+          {/* Mobile Hamburger Menu */}
+          <div className="relative sm:hidden">
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-2 rounded-xl bg-white dark:bg-slate-800 border dark:border-slate-700 shadow-sm"
+            >
+              {mobileMenuOpen ? (
+                <X size={20} className="text-slate-600 dark:text-slate-300" />
+              ) : (
+                <Menu size={20} className="text-slate-600 dark:text-slate-300" />
+              )}
+            </button>
+            
+            {mobileMenuOpen && (
+              <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-xl shadow-xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
+                {session?.user ? (
+                  <button
+                    onClick={() => {
+                      signOut({ callbackUrl: "/dashboard" });
+                      setMobileMenuOpen(false);
+                    }}
+                    className="w-full px-4 py-3 text-left text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2"
+                  >
+                    <LogOut size={16} />
+                    Logout
+                  </button>
+                ) : (
+                  <div className="flex">
+                    <Link
+                      href="/login"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex-1 px-4 py-3 text-center text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 border-r border-slate-200 dark:border-slate-700"
+                    >
+                      Login
+                    </Link>
+                    <Link
+                      href="/signup"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className="flex-1 px-4 py-3 text-center text-sm font-bold text-blue-600 hover:bg-slate-50 dark:hover:bg-slate-700"
+                    >
+                      Sign Up
+                    </Link>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
         </div>
       </nav>
 
       <div
-        className={`flex-1 flex flex-col items-center px-6 transition-all duration-700 overflow-y-auto ${
-          result || loading ? "pt-28 pb-48" : "justify-center"
+        className={`flex-1 flex flex-col items-center px-3 sm:px-6 transition-all duration-700 overflow-y-auto ${
+          result || loading || activeQuery || activePreviewUrl ? "pt-20 sm:pt-28 pb-48" : "pt-24 sm:pt-32 justify-center"
         }`}
       >
         {!result && !loading && !activeQuery && !activePreviewUrl && (
           <header className="text-center mb-2 animate-in fade-in zoom-in">
             <Link href="/">
-              <h1 className="text-5xl font-black mb-4 hover:text-blue-600 transition-colors cursor-pointer">
+              <h1 className="text-3xl sm:text-4xl md:text-5xl font-black mb-4 hover:text-blue-600 transition-colors cursor-pointer">
                 Verify the <span className="text-blue-600">Unseen.</span>
               </h1>
             </Link>
@@ -698,8 +739,8 @@ export default function TruthLensDashboard() {
       </div>
 
       <div
-        className={`fixed bottom-0 left-0 right-0 p-3 sm:p-6 z-50 bg-gradient-to-t from-slate-50 dark:from-[#0f172a] transition-all ${
-          result || loading ? "translate-y-0" : "relative mt-12 sm:mt-12"
+        className={`fixed bottom-0 left-0 right-0 p-2 sm:p-6 z-50 bg-gradient-to-t from-slate-50 dark:from-[#0f172a] transition-all ${
+          result || loading || activeQuery || activePreviewUrl ? "translate-y-0" : "relative mt-8 sm:mt-12"
         }`}
       >
         <div className="max-w-3xl mx-auto relative group">
@@ -850,8 +891,8 @@ export default function TruthLensDashboard() {
 
 function AnalyticsCard({ children, title }: { children: any; title: string }) {
   return (
-    <div className="bg-white dark:bg-slate-900/40 backdrop-blur-lg p-8 rounded-[40px] border dark:border-slate-800 shadow-xl flex flex-col hover:border-slate-700/50 transition-colors">
-      <div className="flex items-center gap-2 mb-8 text-slate-400">
+    <div className="bg-white dark:bg-slate-900/40 backdrop-blur-lg p-4 sm:p-8 rounded-2xl sm:rounded-[40px] border dark:border-slate-800 shadow-xl flex flex-col hover:border-slate-700/50 transition-colors">
+      <div className="flex items-center gap-2 mb-4 sm:mb-8 text-slate-400">
         <Info size={14} />
         <span className="text-[10px] font-bold uppercase tracking-[0.2em]">
           {title}
