@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useSession, signOut } from "next-auth/react";
 import Link from "next/link";
 import { toPng } from "html-to-image";
@@ -23,12 +23,13 @@ import {
   BookmarkCheck,
   Download,
   Menu,
+  Mic,
+  MicOff,
 } from "lucide-react";
 import { useTheme } from "next-themes";
 import BiasMeter from "../components/BiasMeter";
 import VerificationChart from "../components/VerificationCharts";
 import ExampleQueryCards from "../components/ExampleQueryCards";
-import TrendChart from "../components/TrendChart";
 
 interface TempHistoryItem {
   id: string;
@@ -61,6 +62,9 @@ const getBadgeStyles = (category: string) => {
 };
 
 export default function TruthLensDashboard() {
+  const [isListening, setIsListening] = useState(false);
+  const originalRef = useRef("");
+  const recgonitionRef = useRef<any>(null);
   const { data: session } = useSession();
   const { theme, setTheme } = useTheme();
   const [query, setQuery] = useState("");
@@ -116,12 +120,111 @@ export default function TruthLensDashboard() {
     }
   };
 
+  const handleVoiceTyping = () => {
+    // Check for browser support (Chrome and Safari use different prefixes)
+    if (isListening) {
+      if (recgonitionRef.current) {
+        recgonitionRef.current.stop();
+      }
+      setIsListening(false);
+      return;
+    }
+    const SpeechRecognition =
+      (window as any).SpeechRecognition ||
+      (window as any).webkitSpeechRecognition;
+
+    if (!SpeechRecognition) {
+      alert(
+        "Voice typing is not supported in this browser. Please try Chrome, Edge, or Safari.",
+      );
+      return;
+    }
+
+    const recognition = new SpeechRecognition();
+
+    // Map TruthLens dropdown languages to browser language codes
+    const languageCodes: Record<string, string> = {
+      English: "en-IN",
+      Hindi: "hi-IN",
+      Tamil: "ta-IN",
+      Telugu: "te-IN",
+      Bengali: "bn-IN",
+      Marathi: "mr-IN",
+      Gujarati: "gu-IN",
+    };
+
+    // Tell the mic which language to listen for
+    recognition.lang = languageCodes[language] || "en-IN";
+
+    // 1. Force the mic to stay open even if you pause or take a breath
+    recognition.continuous = true;
+
+    // 2. Show the words on the screen *while* you are speaking,
+    // instead of making you wait until the very end.
+    recognition.interimResults = true;
+    recognition.maxAlternatives = 1;
+
+    recognition.onstart = () => {
+      setIsListening(true);
+      originalRef.current = query; // Store the original text before voice input starts
+    };
+
+    recognition.onresult = (event: any) => {
+      let liveTranscript = "";
+
+      // 🟢 Loop through ALL the words spoken in this current session
+      for (let i = 0; i < event.results.length; i++) {
+        liveTranscript += event.results[i][0].transcript;
+      }
+
+      // 🟢 Combine the snapshot with the live speech, overwriting the stutter!
+      const baseText = originalRef.current ? originalRef.current + " " : "";
+      setQuery(baseText + liveTranscript);
+    };
+
+    recognition.onerror = (event: any) => {
+      console.error("Speech recognition error:", event.error);
+      setIsListening(false);
+
+      // Surface the error to the user gracefully
+      switch (event.error) {
+        case "audio-capture":
+          alert(
+            "No microphone detected. Please ensure your microphone is plugged in and not being used by another app.",
+          );
+          break;
+        case "not-allowed":
+          alert(
+            "Microphone access denied. Please allow microphone permissions in your browser settings.",
+          );
+          break;
+        case "network":
+          alert(
+            "Speech recognition requires an internet connection. Please check your network.",
+          );
+          break;
+        case "no-speech":
+          // Usually silent failure is fine here, or a subtle toast notification
+          console.log("No speech was detected.");
+          break;
+        default:
+          alert(`Voice typing stopped. Error: ${event.error}`);
+      }
+    };
+    recognition.onend = () => {
+      setIsListening(false);
+    };
+
+    // Start listening!
+    recognition.start();
+  };
+
   const exportAsImage = async () => {
     const element = document.getElementById("truth-card-content");
     if (!element) return;
 
     try {
-      // 🟢 Generates a high-quality PNG of the dashboard
+      // Generates a high-quality PNG of the dashboard
       const dataUrl = await toPng(element, {
         cacheBust: true,
         backgroundColor: theme === "dark" ? "#0f172a" : "#f8fafc",
@@ -266,15 +369,6 @@ export default function TruthLensDashboard() {
     setIsSaved(true);
   };
 
-  const handleDemoResult = (q: string, mockResult: any) => {
-    setActiveQuery(q);
-    setActivePreviewUrl(null);
-    setResult(mockResult);
-    setQuery("");
-    setViewMode("consensus");
-    setIsSaved(false);
-  };
-
   if (!mounted) return null;
 
   return (
@@ -299,8 +393,13 @@ export default function TruthLensDashboard() {
               <ShieldCheck className="w-2 h-2 sm:w-2.5 sm:h-2.5 text-white" />
             </div>
           </div>
-          <span className="font-bold text-base sm:text-xl tracking-tight">TruthLens</span>
+          <span className="font-bold text-base sm:text-xl tracking-tight">
+            TruthLens
+          </span>
         </button>
+        <span className="mt-12 ml-14 text-xs text-red-500 italic absolute">
+          (Please do not use the voice feature)
+        </span>
 
         <div className="flex items-center gap-1 sm:gap-2">
           <Link
@@ -309,7 +408,7 @@ export default function TruthLensDashboard() {
           >
             <History size={16} className="text-slate-400" />
           </Link>
-          
+
           {/* Desktop Auth Buttons */}
           <div className="hidden sm:flex items-center gap-2">
             {session?.user ? (
@@ -357,10 +456,13 @@ export default function TruthLensDashboard() {
               {mobileMenuOpen ? (
                 <X size={20} className="text-slate-600 dark:text-slate-300" />
               ) : (
-                <Menu size={20} className="text-slate-600 dark:text-slate-300" />
+                <Menu
+                  size={20}
+                  className="text-slate-600 dark:text-slate-300"
+                />
               )}
             </button>
-            
+
             {mobileMenuOpen && (
               <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-xl shadow-xl overflow-hidden z-50 animate-in fade-in slide-in-from-top-2">
                 {session?.user ? (
@@ -400,7 +502,9 @@ export default function TruthLensDashboard() {
 
       <div
         className={`flex-1 flex flex-col items-center px-3 sm:px-6 transition-all duration-700 overflow-y-auto ${
-          result || loading || activeQuery || activePreviewUrl ? "pt-20 sm:pt-28 pb-48" : "pt-24 sm:pt-32 justify-center"
+          result || loading || activeQuery || activePreviewUrl
+            ? "pt-20 sm:pt-28 pb-48"
+            : "pt-24 sm:pt-32 justify-center"
         }`}
       >
         {!result && !loading && !activeQuery && !activePreviewUrl && (
@@ -496,7 +600,7 @@ export default function TruthLensDashboard() {
                       <button
                         onClick={handleSaveResult}
                         disabled={isSaved}
-                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 ${
+                        className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold transition-all duration-200 ml-2 ${
                           isSaved
                             ? "bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300 cursor-default"
                             : "bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 hover:bg-emerald-50 hover:text-emerald-600 dark:hover:bg-emerald-900/40 dark:hover:text-emerald-300 active:scale-95"
@@ -701,18 +805,64 @@ export default function TruthLensDashboard() {
                       <AnalyticsCard title="Sentiment Bias">
                         <div className="flex flex-col items-center justify-center h-full min-h-[200px]">
                           <BiasMeter score={result.bias_score || 0} />
+
+                          {/* 🟢 NEW: Display the AI's reasoning right below the meter */}
+                          {result.bias_reason && (
+                            <p className="text-[11px] text-center text-slate-500 dark:text-slate-400 mt-4 max-w-[80%] leading-relaxed">
+                              "{result.bias_reason}"
+                            </p>
+                          )}
                         </div>
                       </AnalyticsCard>
+
                       <AnalyticsCard title="Source Integrity">
                         <div className="w-full h-full min-h-[220px]">
                           <VerificationChart data={result.verification_audit} />
                         </div>
                       </AnalyticsCard>
-                      <AnalyticsCard title="Temporal Trend">
-                        <div className="flex flex-col h-full min-h-[220px]">
-                          <TrendChart data={result.trend_history || []} />
+
+                      {/* 🟢 NEW: CHRONOLOGICAL TIMELINE REPLACES TREND CHART */}
+                      <AnalyticsCard title="Chronological Timeline">
+                        <div className="flex flex-col h-full min-h-[220px] overflow-y-auto pr-2">
+                          {result.evidence_timeline &&
+                          result.evidence_timeline.length > 0 ? (
+                            <div className="border-l-2 border-slate-200 dark:border-slate-700 ml-2 space-y-6 mt-2 pb-4">
+                              {result.evidence_timeline.map(
+                                (item: any, index: number) => (
+                                  <div key={index} className="relative pl-5">
+                                    <div className="absolute -left-[9px] top-1 h-4 w-4 rounded-full bg-blue-500 ring-4 ring-white dark:ring-[#0f172a]" />
+                                    <span className="text-[10px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-wider">
+                                      {item.date}
+                                    </span>
+                                    <p className="text-xs text-slate-700 dark:text-slate-300 mt-1 leading-relaxed">
+                                      {item.event}
+                                    </p>
+                                    {item.source && (
+                                      <a
+                                        href={item.source}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-[10px] text-slate-400 hover:text-blue-500 underline truncate block mt-2 transition-colors"
+                                      >
+                                        Verify Source ↗
+                                      </a>
+                                    )}
+                                  </div>
+                                ),
+                              )}
+                            </div>
+                          ) : (
+                            <div className="flex-1 flex flex-col items-center justify-center text-slate-400 text-xs italic text-center p-4">
+                              <History size={24} className="mb-2 opacity-20" />
+                              <p>
+                                No historical timeline data detected for this
+                                claim.
+                              </p>
+                            </div>
+                          )}
                         </div>
                       </AnalyticsCard>
+
                       <AnalyticsCard title="Logic Health">
                         <div className="flex flex-col h-full justify-between min-h-[220px]">
                           <p className="text-[12px] italic text-slate-600 dark:text-slate-400">
@@ -740,7 +890,9 @@ export default function TruthLensDashboard() {
 
       <div
         className={`fixed bottom-0 left-0 right-0 p-2 sm:p-6 z-50 bg-gradient-to-t from-slate-50 dark:from-[#0f172a] transition-all ${
-          result || loading || activeQuery || activePreviewUrl ? "translate-y-0" : "relative mt-8 sm:mt-12"
+          result || loading || activeQuery || activePreviewUrl
+            ? "translate-y-0"
+            : "relative mt-8 sm:mt-12"
         }`}
       >
         <div className="max-w-3xl mx-auto relative group">
@@ -765,7 +917,7 @@ export default function TruthLensDashboard() {
             </div>
           )}
 
-          {/* 🟢 RESPONSIVE INPUT CONTAINER: Stacks on mobile, inline on desktop */}
+          {/* 🟢 RESPONSIVE INPUT CONTAINER */}
           <div className="relative flex flex-col sm:flex-row items-center bg-white dark:bg-slate-900 rounded-[20px] sm:rounded-[32px] border border-slate-200 dark:border-slate-800 p-2 shadow-2xl transition-all focus-within:ring-2 focus-within:ring-blue-500/20 gap-2 sm:gap-0">
             {/* Top Row on Mobile (Attachment + Search + Input) */}
             <div className="flex items-center w-full flex-1">
@@ -787,13 +939,29 @@ export default function TruthLensDashboard() {
                 size={20}
               />
 
+              {/* 🟢 NEW: The Mic Button */}
+              <button
+                onClick={handleVoiceTyping}
+                type="button"
+                className={`ml-2 p-2 rounded-full transition-all shrink-0 ${
+                  isListening
+                    ? "bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400 animate-pulse"
+                    : "text-slate-400 hover:text-blue-600 hover:bg-slate-100 dark:hover:bg-slate-800"
+                }`}
+                title="Voice Typing"
+              >
+                {isListening ? <MicOff size={18} /> : <Mic size={18} />}
+              </button>
+
               <input
                 type="text"
                 className="flex-1 w-full p-2 sm:p-3 ml-1 sm:ml-2 outline-none text-[14px] sm:text-[15px] bg-transparent text-slate-800 dark:text-slate-200 placeholder:text-slate-400 min-w-0"
                 placeholder={
-                  selectedFile
-                    ? "Add text context..."
-                    : "Enter a claim or paste screenshot..."
+                  isListening
+                    ? `Listening in ${language}...`
+                    : selectedFile
+                      ? "Add text context..."
+                      : "Enter a claim or paste screenshot..."
                 }
                 value={query || ""}
                 onChange={(e) => setQuery(e.target.value)}

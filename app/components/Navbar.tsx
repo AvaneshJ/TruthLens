@@ -1,93 +1,134 @@
-'use client'
+import Link from "next/link";
+import {
+  History,
+  LogOut,
+  Sun,
+  Moon,
+  Menu,
+  X,
+  FileText,
+  ShieldCheck,
+} from "lucide-react";
+import { useState } from "react";
 
-import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
-import { useAuth } from '../context/AuthContext'
-import { useThemeToggle } from '../context/ThemeContext'
-import styles from './Navbar.module.css'
-
-const links = [
-  { href: '/',        label: 'Home'    },
-  { href: '/analyze', label: 'Analyze' },
-  { href: '/history', label: 'History' },
-  { href: '/about',   label: 'About'   },
-]
-
-function SunIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-      <circle cx="8" cy="8" r="3" stroke="currentColor" strokeWidth="1.4"/>
-      <line x1="8" y1="1" x2="8" y2="3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-      <line x1="8" y1="13" x2="8" y2="15" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-      <line x1="1" y1="8" x2="3" y2="8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-      <line x1="13" y1="8" x2="15" y2="8" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-      <line x1="2.9" y1="2.9" x2="4.3" y2="4.3" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-      <line x1="11.7" y1="11.7" x2="13.1" y2="13.1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-      <line x1="2.9" y1="13.1" x2="4.3" y2="11.7" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-      <line x1="11.7" y1="4.3" x2="13.1" y2="2.9" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
-    </svg>
-  )
-}
-
-function MoonIcon() {
-  return (
-    <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
-      <path d="M13 9.5A6 6 0 015.5 2a6 6 0 100 11A6 6 0 0013 9.5z" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round"/>
-    </svg>
-  )
-}
-
-export default function Navbar() {
-  const { user, logout } = useAuth()
-  const { theme, toggle } = useThemeToggle()
-  const router   = useRouter()
-  const pathname = usePathname()
-  const isHome   = pathname === "/"
+export default function NavBar({
+  theme,
+  setTheme,
+  session,
+  signOut,
+  onReset,
+}: any) {
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   return (
-    <nav className={styles.nav}>
-      <Link href="/" className={styles.brand}>
-        <svg width="22" height="22" viewBox="0 0 22 22" fill="none">
-          <circle cx="9" cy="9" r="6" stroke="var(--accent-blue)" strokeWidth="1.8"/>
-          <line x1="13.5" y1="13.5" x2="19" y2="19" stroke="var(--accent-blue)" strokeWidth="1.8" strokeLinecap="round"/>
-          <line x1="6.5" y1="9" x2="11.5" y2="9" stroke="var(--accent-blue)" strokeWidth="1.2" strokeLinecap="round"/>
-          <line x1="9" y1="6.5" x2="9" y2="11.5" stroke="var(--accent-blue)" strokeWidth="1.2" strokeLinecap="round"/>
-        </svg>
-        <span className={styles.brandText}>Truth<span>Lens</span></span>
-      </Link>
+    <nav className="fixed top-0 left-0 right-0 z-50 flex justify-between items-center px-2 sm:px-4 py-3 max-w-6xl mx-auto backdrop-blur-md bg-slate-50/80 dark:bg-[#0f172a]/80">
+      <button
+        onClick={onReset}
+        className="flex items-center gap-1.5 sm:gap-2 font-bold hover:opacity-80 transition-opacity"
+      >
+        <div className="relative">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-lg sm:rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
+            <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
+          </div>
+          <div className="absolute -top-0.5 -right-0.5 w-3 h-3 sm:w-4 sm:h-4 bg-emerald-500 rounded-full flex items-center justify-center animate-pulse">
+            <ShieldCheck className="w-2 h-2 sm:w-2.5 sm:h-2.5 text-white" />
+          </div>
+        </div>
+        <span className="font-bold text-base sm:text-xl tracking-tight">
+          TruthLens
+        </span>
+      </button>
 
-      <div className={styles.links}>
-        {links.map(l => {
-          const isActive = l.href === '/' ? pathname === '/' : pathname.startsWith(l.href)
-          return (
-            <Link key={l.href} href={l.href}
-              className={`${styles.link} ${isActive ? styles.active : ''}`}>
-              {l.label}
-            </Link>
-          )
-        })}
-      </div>
+      <div className="flex items-center gap-1 sm:gap-2">
+        <Link
+          href="/history"
+          className="p-2 sm:px-3 sm:py-2 bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-xl shadow-sm hover:border-blue-500 transition-all"
+        >
+          <History size={16} className="text-slate-400" />
+        </Link>
 
-      <div className={styles.right}>
-        {/* Theme toggle — hidden on home page */}
-        {!isHome && (
-          <button className={styles.themeBtn} onClick={toggle} title={theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'}>
-            {theme === 'light' ? <MoonIcon /> : <SunIcon />}
+        <div className="hidden sm:flex items-center gap-2">
+          {session?.user ? (
+            <button
+              onClick={() => signOut({ callbackUrl: "/dashboard" })}
+              className="p-3 rounded-xl bg-white dark:bg-slate-800 border dark:border-slate-700 shadow-sm transition-transform hover:scale-105 text-slate-400 hover:text-red-500"
+            >
+              <LogOut className="w-4.5 h-4.5" />
+            </button>
+          ) : (
+            <>
+              <Link
+                href="/login"
+                className="px-4 py-2 bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-xl shadow-sm text-sm font-medium hover:border-blue-500 transition-all"
+              >
+                Login
+              </Link>
+              <Link
+                href="/signup"
+                className="px-4 py-2 bg-blue-600 text-white rounded-xl shadow-sm text-sm font-bold hover:bg-blue-700 transition-all"
+              >
+                Sign Up
+              </Link>
+            </>
+          )}
+        </div>
+
+        <button
+          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+          className="p-2 sm:p-3 rounded-xl bg-white dark:bg-slate-800 border dark:border-slate-700 shadow-sm transition-transform hover:scale-105"
+        >
+          {theme === "dark" ? (
+            <Sun className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-yellow-400" />
+          ) : (
+            <Moon className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-blue-600" />
+          )}
+        </button>
+
+        <div className="relative sm:hidden">
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="p-2 rounded-xl bg-white dark:bg-slate-800 border dark:border-slate-700 shadow-sm"
+          >
+            {mobileMenuOpen ? (
+              <X size={20} className="text-slate-600 dark:text-slate-300" />
+            ) : (
+              <Menu size={20} className="text-slate-600 dark:text-slate-300" />
+            )}
           </button>
-        )}
-
-        {user ? (
-          <>
-            <span className={styles.userPill}>{user.name}</span>
-            <button className={styles.btnGhost} onClick={logout}>Log out</button>
-          </>
-        ) : (
-          <>
-            <button className={styles.btnGhost} onClick={() => router.push('/login')}>Sign in</button>
-            <button className={styles.btnPrimary} onClick={() => router.push('/signup')}>Sign up</button>
-          </>
-        )}
+          {mobileMenuOpen && (
+            <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 border dark:border-slate-700 rounded-xl shadow-xl overflow-hidden z-50">
+              {session?.user ? (
+                <button
+                  onClick={() => {
+                    signOut({ callbackUrl: "/dashboard" });
+                    setMobileMenuOpen(false);
+                  }}
+                  className="w-full px-4 py-3 text-left text-sm font-medium text-slate-600 hover:bg-red-50 flex items-center gap-2"
+                >
+                  <LogOut size={16} /> Logout
+                </button>
+              ) : (
+                <div className="flex">
+                  <Link
+                    href="/login"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex-1 px-4 py-3 text-center text-sm font-medium text-slate-600 border-r border-slate-200"
+                  >
+                    Login
+                  </Link>
+                  <Link
+                    href="/signup"
+                    onClick={() => setMobileMenuOpen(false)}
+                    className="flex-1 px-4 py-3 text-center text-sm font-bold text-blue-600"
+                  >
+                    Sign Up
+                  </Link>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
       </div>
     </nav>
-  )
+  );
 }
