@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
 
+function isStrongPassword(password: string): boolean {
+  if (password.length < 8) return false;
+  const hasLetter = /[A-Za-z]/.test(password);
+  const hasNumber = /\d/.test(password);
+  return hasLetter && hasNumber;
+}
+
 export async function POST(req: NextRequest) {
   try {
     const { email, password, name } = await req.json();
@@ -13,9 +20,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (password.length < 6) {
+    if (!isStrongPassword(password)) {
       return NextResponse.json(
-        { error: "Password must be at least 6 characters" },
+        {
+          error:
+            "Password must be at least 8 characters and include a letter and a number",
+        },
         { status: 400 }
       );
     }

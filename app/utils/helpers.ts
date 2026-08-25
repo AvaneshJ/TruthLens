@@ -7,22 +7,44 @@ export interface VerdictMeta {
 }
 
 export const VERDICT_META: Record<string, VerdictMeta> = {
+  Supported: {
+    label: 'Supported',
+    color: 'var(--real)',
+    bg: 'var(--real-bg)',
+    border: 'var(--real-border)',
+    icon: '✓',
+  },
+  Disputed: {
+    label: 'Disputed',
+    color: 'var(--fake)',
+    bg: 'var(--fake-bg)',
+    border: 'var(--fake-border)',
+    icon: '✕',
+  },
+  Unclear: {
+    label: 'Unclear',
+    color: 'var(--uncertain)',
+    bg: 'var(--uncertain-bg)',
+    border: 'var(--uncertain-border)',
+    icon: '?',
+  },
+  // Legacy aliases
   REAL: {
-    label: 'Likely Real',
+    label: 'Supported',
     color: 'var(--real)',
     bg: 'var(--real-bg)',
     border: 'var(--real-border)',
     icon: '✓',
   },
   FAKE: {
-    label: 'Likely Fake',
+    label: 'Disputed',
     color: 'var(--fake)',
     bg: 'var(--fake-bg)',
     border: 'var(--fake-border)',
     icon: '✕',
   },
   UNCERTAIN: {
-    label: 'Uncertain',
+    label: 'Unclear',
     color: 'var(--uncertain)',
     bg: 'var(--uncertain-bg)',
     border: 'var(--uncertain-border)',
@@ -54,11 +76,43 @@ export function fileToBase64(file: File): Promise<string> {
 }
 
 export function isValidUrl(str: string): boolean {
-  try { new URL(str); return true } catch { return false }
+  try {
+    const u = new URL(str)
+    return u.protocol === 'http:' || u.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+/** Allow only http(s) URLs for hrefs; returns null if unsafe. */
+export function sanitizeHttpUrl(raw: unknown): string | null {
+  if (typeof raw !== 'string' || !raw.trim()) return null
+  try {
+    const u = new URL(raw.trim())
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') return null
+    return u.toString()
+  } catch {
+    return null
+  }
+}
+
+export function normalizeVerdict(
+  result: { verdict?: string; certainty?: number; status?: string } | null | undefined
+): 'Supported' | 'Disputed' | 'Unclear' {
+  const v = result?.verdict
+  if (v === 'Supported' || v === 'Disputed' || v === 'Unclear') return v
+  if (v === 'Verified' || v === 'REAL') return 'Supported'
+  if (v === 'Misleading' || v === 'FAKE') return 'Disputed'
+  if (result?.status === 'FAIL') return 'Unclear'
+  const c = typeof result?.certainty === 'number' ? result.certainty : null
+  if (c === null) return 'Unclear'
+  if (c >= 70) return 'Supported'
+  if (c <= 40) return 'Disputed'
+  return 'Unclear'
 }
 
 export interface AnalysisResult {
-  verdict: 'REAL' | 'FAKE' | 'UNCERTAIN'
+  verdict: 'Supported' | 'Disputed' | 'Unclear' | 'REAL' | 'FAKE' | 'UNCERTAIN'
   confidence: number
   summary: string
   signals: { type: 'ok' | 'warn' | 'bad' | 'info'; text: string }[]

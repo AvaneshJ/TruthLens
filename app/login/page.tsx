@@ -33,10 +33,12 @@ export default function LoginPage() {
     });
 
     if (result?.error) {
-      setError(result.error);
+      setError("Invalid email or password");
       setLoading(false);
     } else {
-      router.push("/dashboard");
+      const params = new URLSearchParams(window.location.search);
+      const next = params.get("next");
+      router.push(next && next.startsWith("/") ? next : "/dashboard");
       router.refresh();
     }
   };
@@ -51,7 +53,7 @@ export default function LoginPage() {
           className="flex items-center gap-2 font-bold text-xl"
         >
           <div className="relative">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
+            <div className="w-10 h-10 bg-[var(--accent-blue)] rounded-xl flex items-center justify-center text-white shadow-md">
               <FileText size={20} />
             </div>
             <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center animate-pulse">

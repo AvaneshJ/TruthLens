@@ -33,8 +33,8 @@ export default function SignupPage() {
       return;
     }
 
-    if (formData.password.length < 6) {
-      setError("Password must be at least 6 characters");
+    if (formData.password.length < 8 || !/[A-Za-z]/.test(formData.password) || !/\d/.test(formData.password)) {
+      setError("Password must be at least 8 characters and include a letter and a number");
       setLoading(false);
       return;
     }
@@ -58,7 +58,11 @@ export default function SignupPage() {
         return;
       }
 
-      router.push("/login?registered=true");
+      const params = new URLSearchParams(window.location.search);
+      const next = params.get("next");
+      const loginQs = new URLSearchParams({ registered: "true" });
+      if (next && next.startsWith("/")) loginQs.set("next", next);
+      router.push(`/login?${loginQs.toString()}`);
     } catch {
       setError("Something went wrong. Please try again.");
       setLoading(false);
@@ -75,7 +79,7 @@ export default function SignupPage() {
           className="flex items-center gap-2 font-bold text-xl"
         >
           <div className="relative">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-blue-500/30">
+            <div className="w-10 h-10 bg-[var(--accent-blue)] rounded-xl flex items-center justify-center text-white shadow-md">
               <FileText size={20} />
             </div>
             <div className="absolute -top-1 -right-1 w-4 h-4 bg-emerald-500 rounded-full flex items-center justify-center animate-pulse">

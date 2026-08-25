@@ -1,41 +1,39 @@
-import type { AnalysisResult } from '../utils/helpers'
+/**
+ * @deprecated Dead client — use same-origin `/api/verify/search` and `/api/verify/media`.
+ * Kept as a thin re-export so accidental imports do not hit wrong backend paths.
+ */
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api'
-
-export async function analyzeNews(data: {
-  type: 'headline' | 'url' | 'image'
-  value: string
-  imageBase64?: string
-}): Promise<AnalysisResult> {
-  const res = await fetch(`${BASE_URL}/analyze`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(data),
-  })
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({})) as { message?: string }
-    throw new Error(err.message || `Server error ${res.status}`)
+export async function analyzeClaim(query: string, language = "English") {
+  const res = await fetch("/api/verify/search", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ query, language }),
+  });
+  const data = await res.json().catch(() => ({
+    status: "FAIL",
+    summary: "Invalid response from verification service.",
+  }));
+  if (!res.ok && data?.status !== "FAIL") {
+    throw new Error(data?.summary || data?.detail || `Server error ${res.status}`);
   }
-  return res.json()
+  return data;
 }
 
-export async function fetchHistory(token: string): Promise<AnalysisResult[]> {
-  const res = await fetch(`${BASE_URL}/history`, {
-    headers: { Authorization: `Bearer ${token}` },
-  })
-  if (!res.ok) throw new Error('Failed to fetch history')
-  return res.json()
-}
-
-export async function loginUser(credentials: {
-  email: string
-  password: string
-}): Promise<{ token: string; user: { email: string; name: string } }> {
-  const res = await fetch(`${BASE_URL}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(credentials),
-  })
-  if (!res.ok) throw new Error('Invalid credentials')
-  return res.json()
+export async function verifyMedia(file: File, query?: string, language = "English") {
+  const formData = new FormData();
+  formData.append("file", file);
+  if (query) formData.append("query", query);
+  formData.append("language", language);
+  const res = await fetch("/api/verify/media", {
+    method: "POST",
+    body: formData,
+  });
+  const data = await res.json().catch(() => ({
+    status: "FAIL",
+    summary: "Invalid response from verification service.",
+  }));
+  if (!res.ok && data?.status !== "FAIL") {
+    throw new Error(data?.summary || data?.detail || `Server error ${res.status}`);
+  }
+  return data;
 }

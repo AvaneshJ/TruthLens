@@ -2,8 +2,9 @@ import "./globals.css";
 import { Providers } from "./components/Providers";
 import type { Metadata } from "next";
 export const metadata: Metadata = {
-  title: "TruthLens — AI News Authenticator",
-  description: "AI-powered news verification and fact-checking.",
+  title: "TruthLens — Evidence-first news verification",
+  description:
+    "Audit headlines and screenshots against official sources, wires, and certified fact-checkers. Streaming verdicts with sources, bias, and audit trails.",
 };
 
 export default function RootLayout({

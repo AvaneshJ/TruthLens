@@ -3,12 +3,21 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 
-export async function GET(req: NextRequest) {
+function safeParseResult(raw: unknown) {
+  if (typeof raw !== "string") return raw;
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return { status: "FAIL", summary: "Stored result could not be parsed.", verdict: "Unclear" };
+  }
+}
+
+export async function GET() {
   try {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
-      return NextResponse.json({ searches: [] });
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
     const searches = await prisma.searchHistory.findMany({
@@ -17,9 +26,9 @@ export async function GET(req: NextRequest) {
       take: 50,
     });
 
-    const parsedSearches = searches.map(search => ({
+    const parsedSearches = searches.map((search) => ({
       ...search,
-      result: typeof search.result === 'string' ? JSON.parse(search.result) : search.result
+      result: safeParseResult(search.result),
     }));
 
     return NextResponse.json({ searches: parsedSearches });
@@ -37,7 +46,7 @@ export async function POST(req: NextRequest) {
     const session = await getServerSession(authOptions);
 
     if (!session?.user?.id) {
-      return NextResponse.json({ saved: false, message: "Not authenticated" });
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
     const { query, result } = await req.json();
@@ -52,7 +61,7 @@ export async function POST(req: NextRequest) {
     const search = await prisma.searchHistory.create({
       data: {
         userId: session.user.id,
-        query,
+        query: String(query).slice(0, 2000),
         result: JSON.stringify(result),
       },
     });

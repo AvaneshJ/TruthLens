@@ -1,22 +1,23 @@
-import styles from './about.module.css'
+import styles from "./about.module.css";
+import Link from "next/link";
 
 const TECH = [
-  { name: 'Next.js 14',   role: 'React framework',    color: '#ffffff' },
-  { name: 'TypeScript',   role: 'Type safety',         color: '#3178c6' },
-  { name: 'CSS Modules',  role: 'Scoped styling',      color: '#f7df1e' },
-  { name: 'Context API',  role: 'State management',    color: '#764abc' },
-  { name: 'Claude AI',    role: 'NLP + fact analysis', color: '#3b82f6' },
-  { name: 'App Router',   role: 'File-based routing',  color: '#000000' },
-]
+  { name: "Next.js 16", role: "App frontend", color: "#3b82f6" },
+  { name: "TypeScript", role: "Type safety", color: "#3178c6" },
+  { name: "FastAPI", role: "Verification API", color: "#009688" },
+  { name: "Gemini", role: "Planning + synthesis", color: "#3b82f6" },
+  { name: "Tavily", role: "Source retrieval", color: "#0ea5e9" },
+  { name: "NextAuth + Prisma", role: "Accounts & history", color: "#6366f1" },
+];
 
 const FLOW: [string, string][] = [
-  ['User Input',   'Headline, URL, or screenshot'],
-  ['Input Layer',  'Type detection + validation'],
-  ['API Call',     'Anthropic Claude API'],
-  ['AI Analysis',  'NLP + credibility reasoning'],
-  ['Verdict',      'REAL / FAKE / UNCERTAIN + signals'],
-  ['History',      'Saved to localStorage'],
-]
+  ["User Input", "Headline, claim text, or screenshot"],
+  ["Secure Proxy", "Next.js routes forward to FastAPI with a server API key"],
+  ["Search Plan", "Gemini builds a 3-part investigation strategy"],
+  ["Evidence Gather", "Tavily queries golden, consensus, and alternative domains"],
+  ["Verdict", "Supported / Disputed / Unclear with certainty, bias, and sources"],
+  ["History", "Optional save to your account or this device"],
+];
 
 export default function AboutPage() {
   return (
@@ -25,10 +26,16 @@ export default function AboutPage() {
         <div className={styles.tag}>About this project</div>
         <h1 className={styles.title}>What is TruthLens?</h1>
         <p className={styles.desc}>
-          TruthLens is an AI-powered news authenticator designed to fight misinformation.
-          It classifies news content as <strong>Real</strong>, <strong>Fake</strong>, or{' '}
-          <strong>Uncertain</strong> by running deep language analysis using large language
-          models — no rigid keyword rules, just genuine AI reasoning.
+          TruthLens is an AI-assisted news verification tool. It does not invent
+          a binary &quot;real vs fake&quot; stamp from keywords alone—it gathers
+          evidence from official and fact-checked sources, then returns a clear
+          verdict with certainty, bias context, and citations you can open.
+        </p>
+        <p className={styles.desc} style={{ marginTop: "1rem" }}>
+          <Link href="/dashboard" style={{ color: "var(--accent-blue)" }}>
+            Open the dashboard
+          </Link>{" "}
+          to verify a claim.
         </p>
       </div>
 
@@ -37,7 +44,9 @@ export default function AboutPage() {
         <div className={styles.flow}>
           {FLOW.map(([step, desc], i) => (
             <div key={step} className={styles.flowStep}>
-              <div className={styles.flowNum}>{String(i + 1).padStart(2, '0')}</div>
+              <div className={styles.flowNum}>
+                {String(i + 1).padStart(2, "0")}
+              </div>
               <div>
                 <div className={styles.flowTitle}>{step}</div>
                 <div className={styles.flowDesc}>{desc}</div>
@@ -51,9 +60,12 @@ export default function AboutPage() {
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Tech stack</h2>
         <div className={styles.techGrid}>
-          {TECH.map(t => (
+          {TECH.map((t) => (
             <div key={t.name} className={styles.techCard}>
-              <div className={styles.techDot} style={{ background: t.color }} />
+              <div
+                className={styles.techDot}
+                style={{ background: t.color }}
+              />
               <div>
                 <div className={styles.techName}>{t.name}</div>
                 <div className={styles.techRole}>{t.role}</div>
@@ -66,11 +78,22 @@ export default function AboutPage() {
       <section className={styles.section}>
         <h2 className={styles.sectionTitle}>Why it matters</h2>
         <div className={styles.cards}>
-          {([
-            ['📰', 'Fake news spreads 6× faster than real news on social media (MIT study, 2018).'],
-            ['🤖', 'AI can detect linguistic patterns used in misinformation before humans can.'],
-            ['🔍', 'Fact-checking by hand is slow — TruthLens gives a verdict in under 2 seconds.'],
-          ] as [string, string][]).map(([icon, text]) => (
+          {(
+            [
+              [
+                "1",
+                "Misinformation travels faster than corrections. TruthLens slows that down with source-backed audits.",
+              ],
+              [
+                "2",
+                "Official and IFCN-certified domains are prioritized so weak SEO pages do not dominate the answer.",
+              ],
+              [
+                "3",
+                "You always see citations and an alternative view—not just a single opaque score.",
+              ],
+            ] as [string, string][]
+          ).map(([icon, text]) => (
             <div key={text} className={styles.card}>
               <span className={styles.cardIcon}>{icon}</span>
               <p className={styles.cardText}>{text}</p>
@@ -83,12 +106,13 @@ export default function AboutPage() {
         <div className={styles.builtBy}>
           <div className={styles.builtTag}>Built with purpose</div>
           <p className={styles.builtText}>
-            TruthLens was created as a final-year project to demonstrate the practical
-            use of AI in combating digital misinformation. It combines NLP, image analysis,
-            and modern frontend architecture to deliver a fast, usable verification tool.
+            TruthLens combines retrieval-augmented generation, source reputation,
+            and a modern Next.js frontend to make claim verification usable in
+            seconds—without pretending history is encrypted when it is simply
+            account- or device-scoped.
           </p>
         </div>
       </section>
     </div>
-  )
+  );
 }

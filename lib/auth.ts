@@ -13,7 +13,7 @@ export const authOptions: AuthOptions = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
-          throw new Error("Please enter email and password");
+          throw new Error("Invalid email or password");
         }
 
         const user = await prisma.user.findUnique({
@@ -21,7 +21,7 @@ export const authOptions: AuthOptions = {
         });
 
         if (!user) {
-          throw new Error("No account found with this email");
+          throw new Error("Invalid email or password");
         }
 
         const isPasswordValid = await bcrypt.compare(
@@ -30,7 +30,7 @@ export const authOptions: AuthOptions = {
         );
 
         if (!isPasswordValid) {
-          throw new Error("Invalid password");
+          throw new Error("Invalid email or password");
         }
 
         return {
